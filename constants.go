@@ -18,6 +18,14 @@ const StorageLimitAnnotation = "resize.topolvm.io/storage_limit"
 // PreviousCapacityBytesAnnotation is the key of previous volume capacity.
 const PreviousCapacityBytesAnnotation = "resize.topolvm.io/pre_capacity_bytes"
 
+// CooldownAnnotation is the minimum duration between successful resize
+// requests for a PVC. It uses Go duration syntax (for example, "6h").
+const CooldownAnnotation = "resize.topolvm.io/cooldown"
+
+// LastResizeAtAnnotation records the RFC3339 timestamp of the last successful
+// resize request. pvc-autoresizer owns this annotation.
+const LastResizeAtAnnotation = "resize.topolvm.io/last_resize_at"
+
 // InitialResizeGroupByAnnotation is the key of the initial-resize group by.
 const InitialResizeGroupByAnnotation = "resize.topolvm.io/initial-resize-group-by"
 

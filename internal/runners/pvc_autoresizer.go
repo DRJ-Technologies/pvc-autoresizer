@@ -40,6 +40,7 @@ func NewPVCAutoresizer(mc MetricsClient, c client.Client, log logr.Logger, inter
 		interval:                  interval,
 		recorder:                  recorder,
 		metricsResetSizeThreshold: metricsResetSizeThreshold,
+		now:                       time.Now,
 	}
 }
 
@@ -50,6 +51,7 @@ type pvcAutoresizer struct {
 	log                       logr.Logger
 	recorder                  events.EventRecorder
 	metricsResetSizeThreshold uint64
+	now                       func() time.Time
 }
 
 // Start implements manager.Runnable
@@ -139,6 +141,7 @@ func (w *pvcAutoresizer) reconcile(ctx context.Context) {
 			metrics.ResizerSuccessResizeTotal.SpecifyLabels(pvc.Name, pvc.Namespace)
 			metrics.ResizerFailedResizeTotal.SpecifyLabels(pvc.Name, pvc.Namespace)
 			metrics.ResizerLimitReachedTotal.SpecifyLabels(pvc.Name, pvc.Namespace)
+			metrics.ResizerCooldownSkippedTotal.SpecifyLabels(pvc.Name, pvc.Namespace)
 
 			namespacedName := types.NamespacedName{
 				Namespace: pvc.Namespace,
@@ -226,6 +229,21 @@ func (w *pvcAutoresizer) resize(ctx context.Context, pvc *corev1.PersistentVolum
 	}
 
 	if threshold > vs.AvailableBytes || inodesThreshold > vs.AvailableInodeSize {
+		now := time.Now()
+		if w.now != nil {
+			now = w.now()
+		}
+		remaining, err := cooldownRemaining(pvc, now)
+		if err != nil {
+			log.V(logLevelWarn).Info("invalid cooldown annotation", "error", err.Error())
+			return err
+		}
+		if remaining > 0 {
+			log.Info("resize skipped because cooldown is active", "remaining", remaining.String())
+			metrics.ResizerCooldownSkippedTotal.Increment(pvc.Name, pvc.Namespace)
+			return nil
+		}
+
 		if pvc.Annotations == nil {
 			pvc.Annotations = make(map[string]string)
 		}
@@ -237,6 +255,7 @@ func (w *pvcAutoresizer) resize(ctx context.Context, pvc *corev1.PersistentVolum
 
 		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = *newReq
 		pvc.Annotations[pvcautoresizer.PreviousCapacityBytesAnnotation] = strconv.FormatInt(vs.CapacityBytes, 10)
+		pvc.Annotations[pvcautoresizer.LastResizeAtAnnotation] = now.UTC().Format(time.RFC3339Nano)
 		err = w.client.Update(ctx, pvc)
 		if err != nil {
 			metrics.KubernetesClientFailTotal.Increment()
@@ -255,6 +274,39 @@ func (w *pvcAutoresizer) resize(ctx context.Context, pvc *corev1.PersistentVolum
 	}
 
 	return nil
+}
+
+func cooldownRemaining(pvc *corev1.PersistentVolumeClaim, now time.Time) (time.Duration, error) {
+	if pvc.Annotations == nil {
+		return 0, nil
+	}
+
+	cooldownValue := pvc.Annotations[pvcautoresizer.CooldownAnnotation]
+	if cooldownValue == "" {
+		return 0, nil
+	}
+	cooldown, err := time.ParseDuration(cooldownValue)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", pvcautoresizer.CooldownAnnotation, err)
+	}
+	if cooldown <= 0 {
+		return 0, fmt.Errorf("%s must be positive", pvcautoresizer.CooldownAnnotation)
+	}
+
+	lastResizeValue := pvc.Annotations[pvcautoresizer.LastResizeAtAnnotation]
+	if lastResizeValue == "" {
+		return 0, nil
+	}
+	lastResize, err := time.Parse(time.RFC3339Nano, lastResizeValue)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", pvcautoresizer.LastResizeAtAnnotation, err)
+	}
+
+	remaining := lastResize.Add(cooldown).Sub(now)
+	if remaining <= 0 {
+		return 0, nil
+	}
+	return remaining, nil
 }
 
 func indexByResizeEnableAnnotation(obj client.Object) []string {

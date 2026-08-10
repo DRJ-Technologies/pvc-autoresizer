@@ -5,6 +5,16 @@
 
 # Welcome to the pvc-autoresizer Project!
 
+The DRJ v0.21.0 fork adds two annotations for monotonic resize rate limiting:
+
+- `resize.topolvm.io/cooldown`: a positive Go duration such as `6h`.
+- `resize.topolvm.io/last_resize_at`: controller-owned RFC3339 state written
+  atomically with a successful PVC resize request.
+
+When both are present, another resize is skipped until the cooldown elapses.
+Malformed cooldown state fails closed. Git must never declare
+`last_resize_at`; it is runtime state owned by the controller.
+
 `pvc-autoresizer` resizes PersistentVolumeClaims (PVCs) when the free amount of storage is below the threshold.
 
 It queries the volume usage metrics from Prometheus that collects metrics from `kubelet`.

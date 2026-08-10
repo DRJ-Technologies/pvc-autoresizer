@@ -1,0 +1,202 @@
+name: Publish PVC Autoresizer
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/publish-pvc-autoresizer.yml
+      - Dockerfile
+      - go.mod
+      - go.sum
+      - constants.go
+      - cmd/**
+      - internal/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REGISTRY: 202011926204.dkr.ecr.us-west-2.amazonaws.com
+  ECR_REPOSITORY: platform/pvc-autoresizer
+  IMAGE_TAG: v0.21.0-drj.1
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: 1.25.7
+          check-latest: false
+          cache: true
+      - name: Test, race-test, and vet
+        env:
+          ENVTEST_KUBERNETES_VERSION: 1.35.0
+          ENVTEST_ASSETS_DIR: ${{ github.workspace }}/testbin
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l constants.go cmd internal)"
+          mkdir -p "$ENVTEST_ASSETS_DIR"
+          go test -race -count 1 ./... --timeout=120s
+          go vet ./...
+      - name: Set up pinned Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          version: v0.35.0
+          driver-opts: image=moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+      - name: Build both production architectures without publishing
+        run: >-
+          docker buildx build
+          --platform linux/amd64,linux/arm64
+          --provenance=false
+          --sbom=false
+          .
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: pvc-autoresizer-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Require the exact main-branch workflow identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          OWNER_ID: ${{ github.repository_owner_id }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$REF" == "refs/heads/main" ]]
+          [[ "$REPOSITORY" == "DRJ-Technologies/pvc-autoresizer" ]]
+          [[ "$REPOSITORY_ID" == "1330234260" ]]
+          [[ "$OWNER_ID" == "131053634" ]]
+          [[ "$WORKFLOW_REF" == "DRJ-Technologies/pvc-autoresizer/.github/workflows/publish-pvc-autoresizer.yml@refs/heads/main" ]]
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: 1.25.7
+          check-latest: false
+          cache: true
+      - name: Re-run the release tests
+        env:
+          ENVTEST_KUBERNETES_VERSION: 1.35.0
+          ENVTEST_ASSETS_DIR: ${{ github.workspace }}/testbin
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l constants.go cmd internal)"
+          mkdir -p "$ENVTEST_ASSETS_DIR"
+          go test -race -count 1 ./... --timeout=120s
+          go vet ./...
+      - name: Set up pinned Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          version: v0.35.0
+          driver-opts: image=moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+      - name: Assume the exact bounded publisher role
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: arn:aws:iam::202011926204:role/drj-platform-prod-volume-autoscaling-image-publisher
+          role-session-name: pvc-autoresizer-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+          output-credentials: false
+          retry-max-attempts: 2
+          unset-current-credentials: true
+      - name: Require immutable scan-on-push repository and resolve existing tag
+        id: preflight
+        run: |
+          set -euo pipefail
+          repository_json="$(aws ecr describe-repositories --repository-names "$ECR_REPOSITORY")"
+          [[ "$(jq -r '.repositories[0].imageTagMutability' <<<"$repository_json")" == "IMMUTABLE" ]]
+          [[ "$(jq -r '.repositories[0].imageScanningConfiguration.scanOnPush' <<<"$repository_json")" == "true" ]]
+          digest="$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$IMAGE_TAG" \
+            --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+          if [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "publish_needed=false" >>"$GITHUB_OUTPUT"
+            echo "existing_digest=$digest" >>"$GITHUB_OUTPUT"
+          else
+            echo "publish_needed=true" >>"$GITHUB_OUTPUT"
+          fi
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
+        with:
+          mask-password: true
+      - name: Build and publish the immutable multi-architecture tag
+        id: build
+        if: ${{ steps.preflight.outputs.publish_needed == 'true' }}
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=false \
+            --sbom=false \
+            --push \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            --metadata-file /tmp/image-metadata.json \
+            .
+          digest="$(jq -r '."containerimage.digest"' /tmp/image-metadata.json)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
+      - name: Resolve and verify the immutable manifest digest
+        id: resolve
+        env:
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+          EXISTING_DIGEST: ${{ steps.preflight.outputs.existing_digest }}
+          PUBLISH_NEEDED: ${{ steps.preflight.outputs.publish_needed }}
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH_NEEDED" == "true" ]]; then digest="$BUILT_DIGEST"; else digest="$EXISTING_DIGEST"; fi
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          remote="$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+          [[ "$remote" == "$digest" ]]
+          index="$(docker buildx imagetools inspect --raw "$ECR_REGISTRY/$ECR_REPOSITORY@$digest")"
+          [[ "$(jq '.manifests | length' <<<"$index")" == "2" ]]
+          [[ "$(jq '[.manifests[] | select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64"))] | length' <<<"$index")" == "2" ]]
+          echo "$index" >/tmp/image-index.json
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
+      - name: Require completed clean ECR scans for amd64 and arm64
+        run: |
+          set -euo pipefail
+          while read -r architecture child_digest; do
+            [[ "$architecture" == "amd64" || "$architecture" == "arm64" ]]
+            complete=false
+            for _ in $(seq 1 60); do
+              findings="$(aws ecr describe-image-scan-findings --repository-name "$ECR_REPOSITORY" --image-id "imageDigest=$child_digest" 2>/dev/null || true)"
+              status="$(jq -r '.imageScanStatus.status // "PENDING"' <<<"${findings:-{}}")"
+              if [[ "$status" == "COMPLETE" ]]; then
+                [[ "$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' <<<"$findings")" == "0" ]]
+                [[ "$(jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0' <<<"$findings")" == "0" ]]
+                complete=true
+                break
+              fi
+              [[ "$status" != "FAILED" && "$status" != "UNSUPPORTED_IMAGE" ]]
+              sleep 10
+            done
+            [[ "$complete" == "true" ]]
+          done < <(jq -r '.manifests[] | [.platform.architecture, .digest] | @tsv' /tmp/image-index.json)
+      - name: Record immutable image
+        env:
+          IMAGE_DIGEST: ${{ steps.resolve.outputs.digest }}
+        run: |
+          echo "\`$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG@$IMAGE_DIGEST\`" >>"$GITHUB_STEP_SUMMARY"
