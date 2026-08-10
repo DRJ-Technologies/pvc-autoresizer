@@ -93,7 +93,7 @@ jobs:
       - name: Verify exact OIDC trust claims without exposing the token
         env:
           EXPECTED_AUDIENCE: sts.amazonaws.com
-          EXPECTED_SUBJECT: repo:DRJ-Technologies/pvc-autoresizer:ref:refs/heads/main
+          EXPECTED_SUBJECT: repo:DRJ-Technologies@131053634/pvc-autoresizer@1330234260:ref:refs/heads/main
           EXPECTED_REPOSITORY: DRJ-Technologies/pvc-autoresizer
           EXPECTED_REPOSITORY_ID: "1330234260"
           EXPECTED_OWNER_ID: "131053634"
