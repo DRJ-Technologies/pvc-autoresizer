@@ -90,6 +90,60 @@ jobs:
           [[ "$REPOSITORY_ID" == "1330234260" ]]
           [[ "$OWNER_ID" == "131053634" ]]
           [[ "$WORKFLOW_REF" == "DRJ-Technologies/pvc-autoresizer/.github/workflows/publish-pvc-autoresizer.yml@refs/heads/main" ]]
+      - name: Verify exact OIDC trust claims without exposing the token
+        env:
+          EXPECTED_AUDIENCE: sts.amazonaws.com
+          EXPECTED_SUBJECT: repo:DRJ-Technologies/pvc-autoresizer:ref:refs/heads/main
+          EXPECTED_REPOSITORY: DRJ-Technologies/pvc-autoresizer
+          EXPECTED_REPOSITORY_ID: "1330234260"
+          EXPECTED_OWNER_ID: "131053634"
+          EXPECTED_REF: refs/heads/main
+          EXPECTED_WORKFLOW: Publish PVC Autoresizer
+        run: |
+          set -euo pipefail
+          oidc_response="$(curl --silent --show-error --fail \
+            --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL:?}&audience=${EXPECTED_AUDIENCE}")"
+          oidc_token="$(jq -er '.value | select(type == "string" and length > 0)' \
+            <<<"$oidc_response")"
+          oidc_payload="${oidc_token#*.}"
+          oidc_payload="${oidc_payload%%.*}"
+          OIDC_PAYLOAD="$oidc_payload" python3 - <<'PY'
+          import base64
+          import json
+          import os
+
+          encoded = os.environ["OIDC_PAYLOAD"]
+          encoded += "=" * (-len(encoded) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(encoded))
+          expected = {
+              "aud": os.environ["EXPECTED_AUDIENCE"],
+              "sub": os.environ["EXPECTED_SUBJECT"],
+              "repository": os.environ["EXPECTED_REPOSITORY"],
+              "repository_id": os.environ["EXPECTED_REPOSITORY_ID"],
+              "repository_owner_id": os.environ["EXPECTED_OWNER_ID"],
+              "ref": os.environ["EXPECTED_REF"],
+              "workflow": os.environ["EXPECTED_WORKFLOW"],
+          }
+          mismatches = sorted(
+              name for name, value in expected.items() if claims.get(name) != value
+          )
+          if mismatches:
+              raise SystemExit(
+                  "OIDC claim contract mismatch: " + ",".join(mismatches)
+              )
+          print(
+              json.dumps(
+                  {
+                      "claims": sorted(expected),
+                      "event": "publisher_oidc_claims_verified",
+                  },
+                  separators=(",", ":"),
+                  sort_keys=True,
+              )
+          )
+          PY
+          unset oidc_payload oidc_token oidc_response
       - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: 1.25.7
