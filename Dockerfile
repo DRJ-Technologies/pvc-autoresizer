@@ -15,8 +15,8 @@ COPY internal/ internal/
 # Build
 RUN CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -ldflags="-w -s" -a -o pvc-autoresizer cmd/*.go
 
-# Stage2: setup runtime container
-FROM scratch
+# Stage2: use a scanner-supported runtime while retaining the static binary.
+FROM alpine:3.22.4@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601
 WORKDIR /
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /workspace/pvc-autoresizer .
