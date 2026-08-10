@@ -196,5 +196,7 @@ jobs:
             [[ "$complete" == "true" ]]
           done < <(jq -r '.manifests[] | [.platform.architecture, .digest] | @tsv' /tmp/image-index.json)
       - name: Record immutable image
+        env:
+          IMAGE_DIGEST: ${{ steps.resolve.outputs.digest }}
         run: |
-          echo "\`$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG@${{ steps.resolve.outputs.digest }}\`" >>"$GITHUB_STEP_SUMMARY"
+          echo "\`$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG@$IMAGE_DIGEST\`" >>"$GITHUB_STEP_SUMMARY"
