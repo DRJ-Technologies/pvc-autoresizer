@@ -162,6 +162,44 @@ var _ = Describe("test resizer", func() {
 		})
 	})
 
+	Context("resize cooldown", func() {
+		var pvc corev1.PersistentVolumeClaim
+		var lastResize time.Time
+
+		BeforeEach(func() {
+			lastResize = time.Date(2026, time.August, 10, 12, 0, 0, 0, time.UTC)
+			pvc = corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					pvcautoresizer.CooldownAnnotation:     "6h",
+					pvcautoresizer.LastResizeAtAnnotation: lastResize.Format(time.RFC3339Nano),
+				}},
+			}
+		})
+
+		It("blocks a second resize until the configured duration elapses", func() {
+			remaining, err := cooldownRemaining(&pvc, lastResize.Add(time.Hour))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(remaining).To(Equal(5 * time.Hour))
+		})
+
+		It("allows a resize exactly at the cooldown boundary", func() {
+			remaining, err := cooldownRemaining(&pvc, lastResize.Add(6*time.Hour))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(remaining).To(BeZero())
+		})
+
+		It("fails closed for malformed cooldown state", func() {
+			pvc.Annotations[pvcautoresizer.LastResizeAtAnnotation] = "not-a-timestamp"
+			_, err := cooldownRemaining(&pvc, lastResize.Add(7*time.Hour))
+			Expect(err).To(HaveOccurred())
+
+			pvc.Annotations[pvcautoresizer.LastResizeAtAnnotation] = lastResize.Format(time.RFC3339Nano)
+			pvc.Annotations[pvcautoresizer.CooldownAnnotation] = "zero"
+			_, err = cooldownRemaining(&pvc, lastResize.Add(7*time.Hour))
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	Context("resize", func() {
 		Context("parameter tests", func() {
 			ctx := context.Background()
@@ -324,6 +362,15 @@ var _ = Describe("test resizer", func() {
 						ALLOWANCE := int64(1 << 10)
 						if expectSizeGi<<30-ALLOWANCE >= req || req > expectSizeGi<<30+ALLOWANCE {
 							return fmt.Errorf("request size(Gi) should be %d, but %d", expectSizeGi, req>>30)
+						}
+						if pvcSizeGi != expectSizeGi {
+							lastResizeAt := pvc.Annotations[pvcautoresizer.LastResizeAtAnnotation]
+							if lastResizeAt == "" {
+								return fmt.Errorf("%s was not written with the resize", pvcautoresizer.LastResizeAtAnnotation)
+							}
+							if _, err := time.Parse(time.RFC3339Nano, lastResizeAt); err != nil {
+								return fmt.Errorf("%s is not RFC3339Nano: %w", pvcautoresizer.LastResizeAtAnnotation, err)
+							}
 						}
 						return nil
 					}

@@ -11,10 +11,11 @@ import (
 
 // Metrics subsystem and all of the keys used by the resizer.
 const (
-	ResizerSuccessResizeTotalKey = "success_resize_total"
-	ResizerFailedResizeTotalKey  = "failed_resize_total"
-	ResizerLoopSecondsTotalKey   = "loop_seconds_total"
-	ResizerLimitReachedTotalKey  = "limit_reached_total"
+	ResizerSuccessResizeTotalKey   = "success_resize_total"
+	ResizerFailedResizeTotalKey    = "failed_resize_total"
+	ResizerLoopSecondsTotalKey     = "loop_seconds_total"
+	ResizerLimitReachedTotalKey    = "limit_reached_total"
+	ResizerCooldownSkippedTotalKey = "cooldown_skipped_total"
 )
 
 func init() {
@@ -61,6 +62,18 @@ type resizerLimitReachedTotalAdapter struct {
 	metric prometheus.CounterVec
 }
 
+type resizerCooldownSkippedTotalAdapter struct {
+	metric prometheus.CounterVec
+}
+
+func (a *resizerCooldownSkippedTotalAdapter) Increment(pvcname string, pvcns string) {
+	a.metric.With(prometheus.Labels{"persistentvolumeclaim": pvcname, "namespace": pvcns}).Inc()
+}
+
+func (a *resizerCooldownSkippedTotalAdapter) SpecifyLabels(pvcname string, pvcns string) {
+	a.metric.With(prometheus.Labels{"persistentvolumeclaim": pvcname, "namespace": pvcns}).Add(0)
+}
+
 func (a *resizerLimitReachedTotalAdapter) Increment(pvcname string, pvcns string) {
 	a.metric.With(prometheus.Labels{"persistentvolumeclaim": pvcname, "namespace": pvcns}).Inc()
 }
@@ -96,6 +109,12 @@ var (
 		Help:      "counter that indicates how many storage limits were reached.",
 	}, []string{"persistentvolumeclaim", "namespace"})
 
+	resizerCooldownSkippedTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: MetricsNamespace,
+		Name:      ResizerCooldownSkippedTotalKey,
+		Help:      "counter that indicates how many resize requests were skipped while the PVC cooldown was active.",
+	}, []string{"persistentvolumeclaim", "namespace"})
+
 	ResizerSuccessResizeTotal *resizerSuccessResizeTotalAdapter = &resizerSuccessResizeTotalAdapter{
 		metric: *resizerSuccessResizeTotal,
 	}
@@ -108,6 +127,9 @@ var (
 	ResizerLimitReachedTotal *resizerLimitReachedTotalAdapter = &resizerLimitReachedTotalAdapter{
 		metric: *resizerLimitReachedTotal,
 	}
+	ResizerCooldownSkippedTotal *resizerCooldownSkippedTotalAdapter = &resizerCooldownSkippedTotalAdapter{
+		metric: *resizerCooldownSkippedTotal,
+	}
 )
 
 func registerResizerMetrics() {
@@ -115,6 +137,7 @@ func registerResizerMetrics() {
 	runtimemetrics.Registry.MustRegister(resizerFailedResizeTotal)
 	runtimemetrics.Registry.MustRegister(resizerLoopSecondsTotal)
 	runtimemetrics.Registry.MustRegister(resizerLimitReachedTotal)
+	runtimemetrics.Registry.MustRegister(resizerCooldownSkippedTotal)
 }
 
 // currentMetricsSizeBytes returns the byte size of all metrics encoded in the
@@ -139,6 +162,7 @@ func resetLabelHeavyMetrics() {
 	resizerSuccessResizeTotal.Reset()
 	resizerFailedResizeTotal.Reset()
 	resizerLimitReachedTotal.Reset()
+	resizerCooldownSkippedTotal.Reset()
 }
 
 // ResetMetricsIfExceedsThreshold checks the total size of all registered metrics and

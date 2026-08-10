@@ -1,5 +1,5 @@
 # Stage1: Build the pvc-autoresizer binary
-FROM --platform=$BUILDPLATFORM golang:1.25 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25.7-bookworm@sha256:564e366a28ad1d70f460a2b97d1d299a562f08707eb0ecb24b659e5bd6c108e1 AS builder
 
 ARG TARGETARCH
 
