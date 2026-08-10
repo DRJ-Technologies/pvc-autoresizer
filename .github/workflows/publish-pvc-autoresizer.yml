@@ -237,7 +237,11 @@ jobs:
             complete=false
             for _ in $(seq 1 60); do
               findings="$(aws ecr describe-image-scan-findings --repository-name "$ECR_REPOSITORY" --image-id "imageDigest=$child_digest" 2>/dev/null || true)"
-              status="$(jq -r '.imageScanStatus.status // "PENDING"' <<<"${findings:-{}}")"
+              if [[ -n "$findings" ]]; then
+                status="$(jq -r '.imageScanStatus.status // "PENDING"' <<<"$findings")"
+              else
+                status=PENDING
+              fi
               if [[ "$status" == "COMPLETE" ]]; then
                 [[ "$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' <<<"$findings")" == "0" ]]
                 [[ "$(jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0' <<<"$findings")" == "0" ]]
