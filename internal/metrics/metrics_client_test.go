@@ -14,3 +14,11 @@ func TestMetricsClientFailTotal(t *testing.T) {
 		t.Fatalf("value is not %d", 1)
 	}
 }
+
+func TestMetricsClientDeletedNodeSkippedTotal(t *testing.T) {
+	MetricsClientDeletedNodeSkippedTotal.Increment()
+	actual := testutil.ToFloat64(metricsClientDeletedNodeSkippedTotal.(prometheus.Collector))
+	if actual != float64(1) {
+		t.Fatalf("value is not %d", 1)
+	}
+}

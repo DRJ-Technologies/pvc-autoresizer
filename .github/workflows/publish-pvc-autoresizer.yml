@@ -19,7 +19,7 @@ env:
   AWS_REGION: us-west-2
   ECR_REGISTRY: 202011926204.dkr.ecr.us-west-2.amazonaws.com
   ECR_REPOSITORY: platform/pvc-autoresizer
-  IMAGE_TAG: v0.21.0-drj.1
+  IMAGE_TAG: v0.21.0-drj.2
 
 jobs:
   validate:
