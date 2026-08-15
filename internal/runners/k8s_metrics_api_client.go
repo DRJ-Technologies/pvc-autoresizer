@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/topolvm/pvc-autoresizer/internal/metrics"
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +25,63 @@ func NewK8sMetricsApiClient() (MetricsClient, error) {
 }
 
 type k8sMetricsApiClient struct {
+}
+
+func nodeWasDeleted(ctx context.Context, clientset kubernetes.Interface, nodeName string) (bool, error) {
+	_, err := clientset.CoreV1().Nodes().Get(ctx, nodeName, v1.GetOptions{})
+	if err == nil {
+		return false, nil
+	}
+	if apierrors.IsNotFound(err) {
+		return true, nil
+	}
+	return false, err
+}
+
+type nodeMetricsFetcher func(context.Context, string) (map[types.NamespacedName]*VolumeStats, error)
+
+func collectPVCUsage(
+	ctx context.Context,
+	clientset kubernetes.Interface,
+	nodes []corev1.Node,
+	fetch nodeMetricsFetcher,
+) (map[types.NamespacedName]*VolumeStats, error) {
+	pvcUsage := make(map[types.NamespacedName]*VolumeStats)
+	var mu sync.Mutex
+
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, node := range nodes {
+		nodeName := node.Name
+		eg.Go(func() error {
+			nodePVCUsage, err := fetch(ctx, nodeName)
+			if err != nil {
+				deleted, verificationErr := nodeWasDeleted(ctx, clientset, nodeName)
+				if verificationErr != nil {
+					return fmt.Errorf(
+						"failed to verify node %s after kubelet metrics error %v: %w",
+						nodeName, err, verificationErr,
+					)
+				}
+				if deleted {
+					metrics.MetricsClientDeletedNodeSkippedTotal.Increment()
+					return nil
+				}
+				return err
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			for k, v := range nodePVCUsage {
+				pvcUsage[k] = v
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	return pvcUsage, nil
 }
 
 func (c *k8sMetricsApiClient) GetMetrics(ctx context.Context) (map[types.NamespacedName]*VolumeStats, error) {
@@ -46,30 +105,15 @@ func (c *k8sMetricsApiClient) GetMetrics(ctx context.Context) (map[types.Namespa
 		return nil, err
 	}
 
-	// create a map to hold PVC usage data
-	pvcUsage := make(map[types.NamespacedName]*VolumeStats)
-	var mu sync.Mutex // serialize writes to pvcUsage
-
-	// use an errgroup to query kubelet for PVC usage on each node
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, node := range nodes.Items {
-		nodeName := node.Name
-		eg.Go(func() error {
-			nodePVCUsage, err := getPVCUsageFromK8sMetricsAPI(ctx, clientset, nodeName)
-			if err != nil {
-				return err
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			for k, v := range nodePVCUsage {
-				pvcUsage[k] = v
-			}
-			return nil
-		})
-	}
-
-	// wait for all queries to complete and handle any errors
-	if err := eg.Wait(); err != nil {
+	pvcUsage, err := collectPVCUsage(
+		ctx,
+		clientset,
+		nodes.Items,
+		func(ctx context.Context, nodeName string) (map[types.NamespacedName]*VolumeStats, error) {
+			return getPVCUsageFromK8sMetricsAPI(ctx, clientset, nodeName)
+		},
+	)
+	if err != nil {
 		metrics.MetricsClientFailTotal.Increment()
 		return nil, err
 	}
