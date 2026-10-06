@@ -1,6 +1,6 @@
 # Agent Instructions
 
-<!-- DRJ:CONTEXT BEGIN v=a526e3c — generated from DRJ-Technologies/drj-context; do not edit here -->
+<!-- DRJ:CONTEXT BEGIN v=520c23b — generated from DRJ-Technologies/drj-context; do not edit here -->
 > **Parent context:** [DRJ-Technologies/drj-context](https://github.com/DRJ-Technologies/drj-context)
 > is canonical for DRJ platform patterns, preferences, and laws.
 > Read the authenticated repository through `gh api` or its registered linked worktree.
@@ -10,7 +10,7 @@
 
 ## DRJ org context (synced — edit in drj-context, never here)
 
-**Environment** — identify the session manager first; Herdr commands/paths/sweeps require verified Herdr scope. AgentDeck keeps its own setup. → `operating.md#environment-and-session-manager`
+**Environment** — identify the session manager first; Herdr commands/paths/sweeps require verified Herdr scope. AgentDeck keeps its own setup. Keep agent/session/terminal IDs out of shared repos; discover contacts in the owning environment, never route from a copied UUID. → `operating.md#environment-and-session-manager`
 **Secrets** — never print/log/commit credentials; reference locations, not values. → `laws.md#secrets`
 **Upstream first** — native interfaces/formats, one maintained implementation and inputs defined once; derive metadata at its consumer. No copied query/build hashes in schemas/templates/manifests, hashes-of-copies inventories or tests only synchronizing them; remove existing duplication when changing affected tooling. Custom schemas/gates/receipts need a named failure existing tools do not prevent. Scoped read-only diagnostics use reusable commands/private output without per-attempt release gates or one-shot retry bans; preserve access/privacy/bounds, review/CI, custody, holds and irreversible safeguards. → `operating.md#process-only-if-absolutely-needed`
 **Process** — only if absolutely needed: rigor (main-proven inputs, receipts, repeated review rounds) for irreversible actions only; docs/plans/coordination stay light; one review round, merges at the reviewed head; no maintenance windows unless the owner asks; act autonomously, never route approvals to the owner; leads drive the accepted plan to full delivery with no idle lanes. → `operating.md#process-only-if-absolutely-needed`, `#act-autonomously-never-route-approvals-to-the-owner`, `#leads-drive-the-plan-to-full-delivery`
