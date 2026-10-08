@@ -1,6 +1,6 @@
 # Agent Instructions
 
-<!-- DRJ:CONTEXT BEGIN v=a9e6691 — generated from DRJ-Technologies/drj-context; do not edit here -->
+<!-- DRJ:CONTEXT BEGIN v=1f54f6e — generated from DRJ-Technologies/drj-context; do not edit here -->
 > **Parent context:** [DRJ-Technologies/drj-context](https://github.com/DRJ-Technologies/drj-context)
 > is canonical for DRJ platform patterns, preferences, and laws.
 > Read the authenticated repository through `gh api` or its registered linked worktree.
@@ -12,6 +12,7 @@
 
 **Environment** — identify the session manager first; Herdr commands/paths/sweeps require verified Herdr scope. AgentDeck keeps its own setup. Keep agent/session/terminal IDs out of shared repos; discover contacts in the owning environment, never route from a copied UUID. → `operating.md#environment-and-session-manager`
 **Secrets / configuration** — never print/log/commit credentials. All new work uses AWS Secrets Manager for credentials, SSM for centrally managed nonsecret settings and the existing ESO/ConfigMap GitOps pattern for Kubernetes; other consumers use the same AWS sources. No new Doppler dependencies. → `laws.md#secrets`, `laws.md#aws-configuration-and-eso`, `patterns.md#aws-configuration-and-eso`
+**Infrastructure** — all new Terraform/OpenTofu work uses OTF, not Spacelift: native PR plans, relevant main commits create saved plans, explicit UI/robot CLI approval; no auto-apply. Keep the documented independent management bootstrap exception and Kubernetes GitOps path. → `laws.md#infrastructure-delivery-through-otf`, `operating.md#native-otf-gitops`
 **Co-founders** — Dan and Rob have equal DRJ permissions under their own identities; no Dan-only build, publish, deploy or admin gate. Preserve common safeguards and separate credentials/sessions. → `laws.md#co-founder-access-parity`
 **Upstream first** — native interfaces/formats, one maintained implementation and inputs defined once; derive metadata at its consumer. No copied query/build hashes in schemas/templates/manifests, hashes-of-copies inventories or tests only synchronizing them; remove existing duplication when changing affected tooling. Custom schemas/gates/receipts need a named failure existing tools do not prevent. Scoped read-only diagnostics use reusable commands/private output without per-attempt release gates or one-shot retry bans; preserve access/privacy/bounds, review/CI, custody, holds and irreversible safeguards. → `operating.md#process-only-if-absolutely-needed`
 **Process** — only if absolutely needed: rigor (main-proven inputs, receipts, repeated review rounds) for irreversible actions only; docs/plans/coordination stay light; one review round, merges at the reviewed head; no maintenance windows unless the owner asks; act autonomously, never route approvals to the owner; leads drive the accepted plan to full delivery with no idle lanes. → `operating.md#process-only-if-absolutely-needed`, `#act-autonomously-never-route-approvals-to-the-owner`, `#leads-drive-the-plan-to-full-delivery`
@@ -24,7 +25,6 @@
 **Branches** — `agent/<slug>-YYYYMMDD`; other prefixes for human-initiated work.
 The date suffix is required; use conventional commit subjects. → `patterns.md#branches-and-commits`
 **Shell** — use `cp -f`, `mv -f`, `rm -f` to avoid interactive aliases. → `patterns.md#non-interactive-shell-commands`
-
 **SSM** — no `->`, `()`, heredocs, or streaming commands like `journalctl -f`;
 append `|| true` so a correct command doesn't report `Status: Failed`.
 → `patterns.md#ssm-command-escaping`
