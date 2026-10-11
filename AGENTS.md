@@ -1,6 +1,6 @@
 # Agent Instructions
 
-<!-- DRJ:CONTEXT BEGIN v=702011d — generated from DRJ-Technologies/drj-context; do not edit here -->
+<!-- DRJ:CONTEXT BEGIN v=d22cb87 — generated from DRJ-Technologies/drj-context; do not edit here -->
 > **Parent context:** [DRJ-Technologies/drj-context](https://github.com/DRJ-Technologies/drj-context)
 > is canonical for DRJ platform patterns, preferences, and laws.
 > Read the authenticated repository through `gh api` or its registered linked worktree.
@@ -18,6 +18,7 @@
 **Process** — only if absolutely needed: rigor (main-proven inputs, receipts, repeated review rounds) for irreversible actions only; docs/plans/coordination stay light; one review round, merges at the reviewed head; no maintenance windows unless the owner asks; act autonomously, never route approvals to the owner; leads drive the accepted plan to full delivery with no idle lanes. → `operating.md#process-only-if-absolutely-needed`, `#act-autonomously-never-route-approvals-to-the-owner`, `#leads-drive-the-plan-to-full-delivery`
 **CI** — keep permanent checks essential to concrete material failures; no permanent jobs for temporary rollout evidence, receipts/hashes, metadata sync or low-priority diagnostics. Extend existing suites, retain essential coverage and path-scope where safe; separate jobs need unavoidable isolation/dependency/platform reasons in the normal PR. Use local/manual checks for nonessential work. → `operating.md#keep-permanent-ci-essential`
 **Teams** — autonomous: own your members, reviewers and infrastructure; app teams may change and roll out platform systems for their usage through approved paths with their own identities. Coordinate actual shared conflicts lead-to-lead; no global queue approval or default maintenance ceremony. Preserve review/CI/main-only provenance/holds; never replay or interrupt other owners' operations. Never share workers; bias toward N independent coders and one reviewer per PR with project context and an author brief. Only leads communicate across teams; members inspect read-only. → `operating.md#team-ownership-and-cross-team-boundaries`
+**Communication** — keep routine agent handoffs and technical bookkeeping in internal channels/work records, not the owner's chat; leads report brief plain-language progress, outcomes and material blockers, without echoing raw reports. Keep evidence available; include technical detail when requested or needed for a result, risk or owner decision. → `operating.md#keep-internal-coordination-out-of-owner-updates`
 **Unfamiliar tools** — read the real interface and prove it on one row first; plausible output can be wrong. → `operating.md`
 **Model allocation** — consider Astra 6/xhigh, Sol 6.1/xhigh, Opus 5.5 and Fable 5.1 using task evidence and fresh capacity. → `operating.md#model-and-account-aware-planning`
 **GitHub** — use `gh` and verify DRJ access before pushing; on SSH-agent failure use the
@@ -33,7 +34,6 @@ append `|| true` so a correct command doesn't report `Status: Failed`.
 operation. Link, don't copy; edit in place, retire obsolete duplicates and fix links.
 Keep current status compact; PR/CI records hold routine detail. Historical logs are not current posture; runbooks win over drifting agent files.
 → `patterns.md#documentation-structure`
-
 **Agent files** — `AGENTS.md` is canonical and real; `CLAUDE.md` is a git
 symlink to it. After creating one, verify `git ls-files -s CLAUDE.md` prints
 mode `120000` — a `core.symlinks=false` checkout silently commits a text file
