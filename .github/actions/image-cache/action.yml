@@ -14,10 +14,14 @@ runs:
   using: composite
   steps:
     - name: Authenticate to the image cache
-      uses: DRJ-Technologies/build-platform/.github/actions/database-fixture@a3e0df92bec3971b5d89337d94b3aced35ca6f97
+      # Public repositories cannot consume the organization's private action.
+      uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
       with:
-        image: ${{ inputs.image }}
         role-to-assume: arn:aws:iam::202011926204:role/drj-build-prod-ci-image-cache
+        aws-region: us-east-1
+        role-duration-seconds: 900
+    - name: Log in to the image cache
+      uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
     - name: Configure native registry routes
       id: config
       shell: bash
