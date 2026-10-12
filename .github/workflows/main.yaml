@@ -13,14 +13,17 @@ jobs:
     name: "build"
     runs-on: "ubuntu-22.04"
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: "Set up QEMU"
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-      - name: "Set up Docker Buildx"
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Configure the image cache
+        uses: ./.github/actions/image-cache
+        with:
+          qemu: 'true'
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
@@ -31,3 +34,6 @@ jobs:
       - run: make test
       - run: env NO_ANNOTATION_CHECK=true make test
       - run: make image
+      - name: Remove private registry configuration
+        if: always()
+        run: if [[ -n "${IMAGE_CACHE_CONFIG:-}" ]]; then rm -rf -- "$IMAGE_CACHE_CONFIG"; fi

@@ -1,5 +1,9 @@
 apiVersion:  kind.x-k8s.io/v1alpha4
 kind: Cluster
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/etc/containerd/certs.d"
 # patch the generated kubeadm config with some extra settings
 kubeadmConfigPatches:
 - |
@@ -21,11 +25,17 @@ kubeadmConfigPatches:
 nodes:
 - role: control-plane
   extraMounts:
+    - containerPath: /etc/containerd/certs.d
+      hostPath: "@IMAGE_CACHE_DIRECTORY@"
+      readOnly: true
     - containerPath: /var/lib/kubelet
       hostPath: /tmp/autoresizer/controller
       propagation: Bidirectional
 - role: worker
   extraMounts:
+    - containerPath: /etc/containerd/certs.d
+      hostPath: "@IMAGE_CACHE_DIRECTORY@"
+      readOnly: true
     - containerPath: /run/topolvm
       hostPath: /tmp/autoresizer/lvmd
     - containerPath: /var/lib/kubelet

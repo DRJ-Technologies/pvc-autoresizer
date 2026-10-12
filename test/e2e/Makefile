@@ -7,6 +7,7 @@ export KUBERNETES_VERSION
 SUDO := sudo
 BINDIR := $(shell pwd)/../../bin
 TMPDIR := /tmp/autoresizer
+IMAGE_CACHE_DIRECTORY ?= $(TMPDIR)/image-cache
 KUBECTL := $(BINDIR)/kubectl
 HELM := $(BINDIR)/helm
 GINKGO := $(BINDIR)/ginkgo
@@ -53,9 +54,19 @@ test:
 	E2ETEST=1 BINDIR=$(BINDIR) $(GINKGO) --fail-fast -v .
 
 .PHONY: launch-kind
+launch-kind: SHELL := /bin/bash
+launch-kind: .SHELLFLAGS := -euo pipefail -c
 launch-kind: $(TMPDIR)/topolvm
-	cp autoresizer-cluster.yaml $(TMPDIR)/topolvm/example/kind/topolvm-cluster.yaml
-	make -C $(TMPDIR)/topolvm/example run \
+	mkdir -p "$(IMAGE_CACHE_DIRECTORY)"
+	sed 's|@IMAGE_CACHE_DIRECTORY@|$(IMAGE_CACHE_DIRECTORY)|g' autoresizer-cluster.yaml > $(TMPDIR)/topolvm/example/kind/topolvm-cluster.yaml
+	kind_image=(); \
+	if [[ -n "$(IMAGE_CACHE_REGISTRY)" ]]; then \
+		upstream=$$($(MAKE) --no-print-directory -s -C $(TMPDIR)/topolvm -f versions.mk \
+			--eval='print-kind-image:;@printf "%s\n" $$(KIND_NODE_IMAGE)' print-kind-image); \
+		[[ "$$upstream" =~ ^kindest/node:[^[:space:]]+@sha256:[a-f0-9]{64}$$ ]] || exit 1; \
+		kind_image=("KIND_NODE_IMAGE=$(IMAGE_CACHE_REGISTRY)/docker-hub/$$upstream"); \
+	fi; \
+	$(MAKE) -C $(TMPDIR)/topolvm/example run "$${kind_image[@]}" \
 		KUBERNETES_VERSION=$(KUBERNETES_VERSION) \
 		KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) \
 		TMPDIR=$(TMPDIR)
