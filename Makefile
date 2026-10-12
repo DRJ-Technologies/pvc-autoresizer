@@ -19,6 +19,7 @@ ZIZMOR = $(BINDIR)/zizmor
 
 IMAGE_TAG ?= latest
 IMAGE_PREFIX ?= ghcr.io/topolvm/
+DOCKER_BUILD ?= docker build
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -119,7 +120,7 @@ run: manifests generate ## Run a controller from your host.
 
 .PHONY: image
 image: ## Build docker image.
-	docker build -t $(IMAGE_PREFIX)pvc-autoresizer:devel .
+	$(DOCKER_BUILD) -t $(IMAGE_PREFIX)pvc-autoresizer:devel .
 
 .PHONY: multi-platform-image
 multi-platform-image: ## Build multi-platform docker image.

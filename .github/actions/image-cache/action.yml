@@ -1,0 +1,41 @@
+name: Configure CI image cache
+description: Authenticate and configure native BuildKit and optional Kind registry routes
+inputs:
+  image:
+    description: Existing BuildKit image through the CI cache
+    default: 202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub/moby/buildkit:buildx-stable-1
+  kind:
+    description: Prepare private containerd configuration for the disposable test cluster
+    default: 'false'
+  qemu:
+    description: Configure the existing QEMU image through the cache
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to the image cache
+      uses: DRJ-Technologies/build-platform/.github/actions/database-fixture@a3e0df92bec3971b5d89337d94b3aced35ca6f97
+      with:
+        image: ${{ inputs.image }}
+        role-to-assume: arn:aws:iam::202011926204:role/drj-build-prod-ci-image-cache
+    - name: Configure native registry routes
+      id: config
+      shell: bash
+      env:
+        BUILDKIT_IMAGE: ${{ inputs.image }}
+        CONFIGURE_KIND: ${{ inputs.kind }}
+      run: |
+        set -euo pipefail
+        args=()
+        if [[ "$CONFIGURE_KIND" == true ]]; then args+=(--kind); fi
+        python3 "$GITHUB_ACTION_PATH/configure.py" --image "$BUILDKIT_IMAGE" "${args[@]}"
+    - name: Set up QEMU
+      if: inputs.qemu == 'true'
+      uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      with:
+        image: ${{ steps.config.outputs.registry }}/docker-hub/tonistiigi/binfmt:latest
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      with:
+        driver-opts: image=${{ inputs.image }}
+        buildkitd-config: ${{ steps.config.outputs.config }}
