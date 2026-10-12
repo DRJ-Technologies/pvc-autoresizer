@@ -20,6 +20,7 @@ jobs:
     runs-on: "ubuntu-22.04"
     permissions:
       contents: read
+      id-token: write
     timeout-minutes: 60
     strategy:
       matrix:
@@ -33,15 +34,23 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
+      - name: Configure the image cache
+        uses: ./.github/actions/image-cache
+        with:
+          kind: 'true'
       - run: make -C test/e2e setup
       - run: make -C test/e2e init-app-with-cert-manager
       - run: make -C test/e2e test
+      - name: Remove private registry configuration
+        if: always()
+        run: if [[ -n "${IMAGE_CACHE_CONFIG:-}" ]]; then rm -rf -- "$IMAGE_CACHE_CONFIG"; fi
 
   e2e-k8s-without-cert-manager:
     name: "e2e-k8s-without-cert-manager"
     runs-on: "ubuntu-22.04"
     permissions:
       contents: read
+      id-token: write
     timeout-minutes: 60
     strategy:
       matrix:
@@ -55,15 +64,23 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
+      - name: Configure the image cache
+        uses: ./.github/actions/image-cache
+        with:
+          kind: 'true'
       - run: make -C test/e2e setup
       - run: make -C test/e2e init-app-without-cert-manager
       - run: make -C test/e2e test
+      - name: Remove private registry configuration
+        if: always()
+        run: if [[ -n "${IMAGE_CACHE_CONFIG:-}" ]]; then rm -rf -- "$IMAGE_CACHE_CONFIG"; fi
 
   e2e-k8s-with-metrics-api:
     name: "e2e-k8s-with-metrics-api"
     runs-on: "ubuntu-22.04"
     permissions:
       contents: read
+      id-token: write
     timeout-minutes: 60
     strategy:
       matrix:
@@ -77,6 +94,13 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
+      - name: Configure the image cache
+        uses: ./.github/actions/image-cache
+        with:
+          kind: 'true'
       - run: make -C test/e2e setup
       - run: make -C test/e2e init-app-with-metrics-api
       - run: make -C test/e2e test
+      - name: Remove private registry configuration
+        if: always()
+        run: if [[ -n "${IMAGE_CACHE_CONFIG:-}" ]]; then rm -rf -- "$IMAGE_CACHE_CONFIG"; fi
