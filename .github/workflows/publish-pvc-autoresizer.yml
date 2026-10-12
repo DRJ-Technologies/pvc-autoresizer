@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: us-west-2
+  ECR_PUBLISH_REGION: us-west-2
   ECR_REGISTRY: 202011926204.dkr.ecr.us-west-2.amazonaws.com
   ECR_REPOSITORY: platform/pvc-autoresizer
   IMAGE_TAG: v0.21.0-drj.2
@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -47,11 +48,21 @@ jobs:
           mkdir -p "$ENVTEST_ASSETS_DIR"
           go test -race -count 1 ./... --timeout=120s
           go vet ./...
+      - name: Authenticate to the image cache
+        uses: DRJ-Technologies/build-platform/.github/actions/database-fixture@a3e0df92bec3971b5d89337d94b3aced35ca6f97
+        with:
+          image: 202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub/moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          role-to-assume: arn:aws:iam::202011926204:role/drj-build-prod-ci-image-cache
       - name: Set up pinned Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
         with:
           version: v0.35.0
-          driver-opts: image=moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          driver-opts: image=202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub/moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub"]
+            [registry."gcr.io"]
+              mirrors = ["202011926204.dkr.ecr.us-east-1.amazonaws.com/mirror/gcr.io"]
       - name: Build both production architectures without publishing
         run: >-
           docker buildx build
@@ -159,18 +170,28 @@ jobs:
           mkdir -p "$ENVTEST_ASSETS_DIR"
           go test -race -count 1 ./... --timeout=120s
           go vet ./...
+      - name: Authenticate to the image cache
+        uses: DRJ-Technologies/build-platform/.github/actions/database-fixture@a3e0df92bec3971b5d89337d94b3aced35ca6f97
+        with:
+          image: 202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub/moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          role-to-assume: arn:aws:iam::202011926204:role/drj-build-prod-ci-image-cache
       - name: Set up pinned Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
         with:
           version: v0.35.0
-          driver-opts: image=moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          driver-opts: image=202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub/moby/buildkit@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["202011926204.dkr.ecr.us-east-1.amazonaws.com/docker-hub"]
+            [registry."gcr.io"]
+              mirrors = ["202011926204.dkr.ecr.us-east-1.amazonaws.com/mirror/gcr.io"]
       - name: Assume the exact bounded publisher role
         uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: arn:aws:iam::202011926204:role/drj-platform-prod-volume-autoscaling-image-publisher
           role-session-name: pvc-autoresizer-${{ github.run_id }}
           role-duration-seconds: 3600
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ env.ECR_PUBLISH_REGION }}
           mask-aws-account-id: true
           output-credentials: false
           retry-max-attempts: 2
