@@ -1,6 +1,6 @@
 # Agent Instructions
 
-<!-- DRJ:CONTEXT BEGIN v=6084c8e — generated from DRJ-Technologies/drj-context; do not edit here -->
+<!-- DRJ:CONTEXT BEGIN v=1a38ef8 — generated from DRJ-Technologies/drj-context; do not edit here -->
 > **Parent context:** [DRJ-Technologies/drj-context](https://github.com/DRJ-Technologies/drj-context)
 > is canonical for DRJ platform patterns, preferences, and laws.
 > Read the authenticated repository through `gh api` or its registered linked worktree.
@@ -22,7 +22,7 @@
 **Teams** — autonomous: own your members, reviewers and infrastructure; app teams may change and roll out platform systems for their usage through approved paths with their own identities. Coordinate actual shared conflicts lead-to-lead; no global queue approval or default maintenance ceremony. Preserve review/CI/main-only provenance/holds; never replay or interrupt other owners' operations. Never share workers; bias toward N independent coders and one reviewer per PR with project context and an author brief. Only leads communicate across teams; members inspect read-only. → `operating.md#team-ownership-and-cross-team-boundaries`
 **Communication** — keep routine agent handoffs and technical bookkeeping in internal channels/work records, not the owner's chat; leads report brief plain-language progress, outcomes and material blockers, without echoing raw reports. Keep evidence available; include technical detail when requested or needed for a result, risk or owner decision. → `operating.md#keep-internal-coordination-out-of-owner-updates`
 **Unfamiliar tools** — read the real interface and prove it on one row first; plausible output can be wrong. → `operating.md`
-**Model allocation** — consider Astra 6/xhigh, Sol 6.1/xhigh, Opus 5.5 and Fable 5.1 using task evidence and fresh capacity. → `operating.md#model-and-account-aware-planning`
+**Model allocation** — coder fleet: OpenAI/Codex and Anthropic/Claude Code only. Start with Sol 6.1/xhigh for general engineering, Opus 5.5 for demanding work/review, Astra 6/xhigh for escalation. Follow dated task-fit guidance and fresh capacity; preserve active owners and holds. → `operating.md#model-and-account-aware-planning`
 **GitHub** — use `gh` and verify DRJ access before pushing; on SSH-agent failure use the
 `gh` credential wrapper. → `patterns.md#git-and-github`
 **Stacked PRs** — prefer native GitHub stacks for dependent changes; preserve ownership, checks and merge scope. → `operating.md#prefer-github-stacked-pull-requests`
