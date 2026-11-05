@@ -1,6 +1,6 @@
 # Agent Instructions
 
-<!-- DRJ:CONTEXT BEGIN v=1ae080c — generated from DRJ-Technologies/drj-context; do not edit here -->
+<!-- DRJ:CONTEXT BEGIN v=1c86fb4 — generated from DRJ-Technologies/drj-context; do not edit here -->
 > **Parent context:** [DRJ-Technologies/drj-context](https://github.com/DRJ-Technologies/drj-context)
 > is canonical for DRJ platform patterns, preferences, and laws.
 > Read the authenticated repository through `gh api` or its registered linked worktree.
@@ -29,6 +29,7 @@
 **Branches** — `agent/<slug>-YYYYMMDD`; other prefixes for human-initiated work.
 The date suffix is required; use conventional commit subjects. → `patterns.md#branches-and-commits`
 **Shell** — use `cp -f`, `mv -f`, `rm -f` to avoid interactive aliases. → `patterns.md#non-interactive-shell-commands`
+**Shared hosts** — on disk/resource pressure, first free only your own temp, stopped containers and volumes, plus unused build cache and journal; escalate the rest. → `operating.md#shared-host-resources-fix-what-you-safely-can`
 **SSM** — no `->`, `()`, heredocs, or streaming commands like `journalctl -f`;
 append `|| true` so a correct command doesn't report `Status: Failed`.
 → `patterns.md#ssm-command-escaping`
